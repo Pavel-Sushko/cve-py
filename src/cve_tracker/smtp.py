@@ -1,0 +1,98 @@
+import socket
+
+
+class SMTP:
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def start(self):
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(1)
+        print(f'Server listening on port {self.port}...')
+
+        while True:
+            client_socket, client_address = self.server_socket.accept()
+            self.handle_client(client_socket)
+
+    def stop(self):
+        self.server_socket.close()
+
+    def handle_client(self, client_socket):
+        self.send_response(client_socket, 220, 'localhost SMTP Service ready')
+        self.send_response(client_socket, 250, 'Hello')
+
+        handler = CommandHandler()
+
+        while True:
+            data = self.receive_data(client_socket)
+            if not data:
+                break
+
+            command = data.decode().strip().split()[0].upper()
+            response_code, response_message = handler.handle_command(
+                command, data)
+            self.send_response(client_socket, response_code, response_message)
+
+        client_socket.close()
+
+        exit()
+
+    def send_response(self, client_socket, code, message):
+        response = '{} {}\r\n'.format(code, message)
+        client_socket.sendall(response.encode())
+
+    def receive_data(self, client_socket):
+        data = b''
+        while b'\r\n' not in data:
+            recv_data = client_socket.recv(1024)
+            if not recv_data:
+                break
+            data += recv_data
+        return data
+
+
+class CommandHandler:
+    def __init__(self):
+        self.handlers = {
+            'EHLO': EHLOCommandHandler(),
+            'HELO': EHLOCommandHandler(),
+            'MAIL': MAILCommandHandler(),
+            'RCPT': RCPTCommandHandler(),
+            'DATA': DATACommandHandler(),
+        }
+
+    def handle_command(self, command, data):
+        handler = self.handlers.get(command, UnrecognizedCommandHandler())
+        return handler.handle(data)
+
+
+class EHLOCommandHandler:
+    def handle(self, data):
+        return 250, 'OK'
+
+
+class MAILCommandHandler:
+    def handle(self, data):
+        return 250, 'OK'
+
+
+class RCPTCommandHandler:
+    def handle(self, data):
+        return 250, 'OK'
+
+
+class DATACommandHandler:
+    def handle(self, data):
+        return 354, 'Start mail input; end with <CRLF>.<CRLF>'
+
+
+class UnrecognizedCommandHandler:
+    def handle(self, data):
+        return 500, 'Syntax error, command unrecognized'
+
+
+if __name__ == '__main__':
+    smtp_server = SMTP('localhost', 1025)
+    smtp_server.start()
