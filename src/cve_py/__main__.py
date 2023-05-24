@@ -1,0 +1,12 @@
+import cve_py.api as api
+import cve_py.database as database
+
+
+def main():
+    vulns = api.get_cves()
+
+    database.update_database(vulns)
+
+
+if __name__ == '__main__':
+    main()
